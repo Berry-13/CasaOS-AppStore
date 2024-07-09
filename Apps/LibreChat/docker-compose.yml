@@ -1,0 +1,149 @@
+version: "3.4"
+name: librechat
+services:
+  api:
+    container_name: LibreChat
+    ports:
+      - "${PORT}:${PORT}"
+    depends_on:
+      - mongodb
+      - rag_api
+    image: ghcr.io/danny-avila/librechat-dev:6c306a662cf90a99622e889c007f264a9b831034
+    restart: always
+    user: "${UID}:${GID}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - PGID=$PGID
+      - PUID=$PUID
+      - TZ=$TZ
+      - HOST=0.0.0.0
+      - PORT=3080
+      - MONGO_URI=mongodb://mongodb:27017/LibreChat
+      - MEILI_HOST=http://meilisearch:7700
+      - RAG_PORT=${RAG_PORT:-8000}
+      - RAG_API_URL=http://rag_api:${RAG_PORT:-8000}
+      - DOMAIN_CLIENT=http://localhost:3080
+      - DOMAIN_SERVER=http://localhost:3080
+      - NO_INDEX=true
+      - ANTHROPIC_API_KEY=user_provided
+      - BINGAI_TOKEN=user_provided
+      - GOOGLE_KEY=user_provided
+      - OPENAI_API_KEY=user_provided
+      - ASSISTANTS_API_KEY=user_provided
+      - CREDS_KEY=f34be427ebb29de8d88c107a71546019685ed8b241d8f2ed00c3df97ad2566f0
+      - CREDS_IV=e2341419ec3dd3d19b13a1a87fafcbfb
+      - SEARCH=true
+      - MEILI_NO_ANALYTICS=true
+      - MEILI_MASTER_KEY=DrhYf7zENyR6AlUCKmnz0eYASOQdl6zxH7s7MKFSfFCt
+      - ALLOW_EMAIL_LOGIN=true
+      - ALLOW_REGISTRATION=true
+      - ALLOW_SOCIAL_LOGIN=false
+      - ALLOW_SOCIAL_REGISTRATION=false
+      - ALLOW_PASSWORD_RESET=false
+      - ALLOW_UNVERIFIED_EMAIL_LOGIN=true
+      - SESSION_EXPIRY=1000 * 60 * 15
+      - REFRESH_TOKEN_EXPIRY=(1000 * 60 * 60 * 24) * 7
+      - JWT_SECRET=16f8c0ef4a5d391b26034086c628469d3f9f497f08163ab9b40137092f2909ef
+      - JWT_REFRESH_SECRET=eaa5191f2914e30b9387fd84e254e4ba6fc51b4654968a9b0803b456a54b8418
+    volumes:
+      - type: bind
+        source: /DATA/AppData/$AppID/images
+        target: /app/client/public/images
+      - type: bind
+        source: /DATA/AppData/$AppID/logs
+        target: /app/api/logs
+
+  mongodb:
+    container_name: chat-mongodb
+    image: mongo:4.4.18
+    restart: always
+    user: "${UID}:${GID}"
+    volumes:
+      - ./data-node:/data/db
+    command: mongod --noauth
+  meilisearch:
+    container_name: chat-meilisearch
+    image: getmeili/meilisearch:v1.9.0
+    restart: always
+    user: "${UID}:${GID}"
+    environment:
+      - MEILI_HOST=http://meilisearch:7700
+      - MEILI_NO_ANALYTICS=true
+      - MEILI_MASTER_KEY=DrhYf7zENyR6AlUCKmnz0eYASOQdl6zxH7s7MKFSfFCt
+    volumes:
+      - type: bind
+        source: /DATA/AppData/$AppID/meili_data
+        target: /meili_data
+  vectordb:
+    container_name: vectordb
+    image: ankane/pgvector:0.5.1
+    environment:
+      POSTGRES_DB: mydatabase
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+    restart: always
+    volumes:
+      - type: bind
+        source: /DATA/AppData/$AppID/postgresql_data
+        target: /var/lib/postgresql/data
+  rag_api:
+    container_name: rag_api
+    image: ghcr.io/danny-avila/librechat-rag-api-dev-lite:c289c20c620aa8e69439c9676bbde9d35d019748
+    environment:
+      - DB_HOST=vectordb
+      - RAG_PORT=${RAG_PORT:-8000}
+    restart: always
+    depends_on:
+      - vectordb
+    env_file:
+      - stack.env
+
+x-casaos:
+  architectures:
+    - amd64
+    - arm64
+  main: LibreChat
+  author: berry-13
+  category: Chat
+  description:
+    en_us: "Enhanced ChatGPT Clone: Features OpenAI, Assistants API, Azure, Groq, GPT-4 Vision, Mistral, Bing, Anthropic, OpenRouter, Vertex AI, Gemini, AI model switching, message search, langchain, DALL-E-3, ChatGPT Plugins, OpenAI Functions, Secure Multi-User System, Presets, completely open-source for self-hosting. More features in development"
+    zh_cn: "增强版ChatGPT克隆：具备OpenAI、Assistants API、Azure、Groq、GPT-4 Vision、Mistral、Bing、Anthropic、OpenRouter、Vertex AI、Gemini、AI模型切换、消息搜索、langchain、DALL-E-3、ChatGPT插件、OpenAI函数、安全多用户系统、预设，完全开源以供自托管。更多功能开发中"
+    ar_sa: "نسخة محسنّة من ChatGPT: تتميز بـ OpenAI، Assistants API، Azure، Groq، GPT-4 Vision، Mistral، Bing، Anthropic، OpenRouter، Vertex AI، Gemini، تبديل نماذج AI، بحث في الرسائل، langchain، DALL-E-3، إضافات ChatGPT، وظائف OpenAI، نظام متعدد المستخدمين الآمن، إعدادات مسبقة، مفتوح المصدر تمامًا للاستضافة الذاتية. المزيد من الميزات قيد التطوير"
+    de_de: "Verbesserter ChatGPT-Klon: Enthält OpenAI, Assistants API, Azure, Groq, GPT-4 Vision, Mistral, Bing, Anthropic, OpenRouter, Vertex AI, Gemini, AI-Modellwechsel, Nachrichtensuche, langchain, DALL-E-3, ChatGPT-Plugins, OpenAI-Funktionen, sicheres Mehrbenutzersystem, Voreinstellungen, vollständig Open-Source für Selbsthosting. Weitere Funktionen in Entwicklung"
+    es_es: "Clon mejorado de ChatGPT: Características OpenAI, Assistants API, Azure, Groq, GPT-4 Vision, Mistral, Bing, Anthropic, OpenRouter, Vertex AI, Gemini, cambio de modelo AI, búsqueda de mensajes, langchain, DALL-E-3, Complementos de ChatGPT, Funciones de OpenAI, Sistema seguro multiusuario, Ajustes preestablecidos, completamente de código abierto para auto-alojamiento. Más funciones en desarrollo"
+    fr_fr: "Clone ChatGPT amélioré : fonctionnalités OpenAI, Assistants API, Azure, Groq, GPT-4 Vision, Mistral, Bing, Anthropic, OpenRouter, Vertex AI, Gemini, commutation de modèle AI, recherche de message, langchain, DALL-E-3, Plugins ChatGPT, Fonctions OpenAI, Système multi-utilisateurs sécurisé, presets, complètement open-source pour auto-hébergement. Plus de fonctionnalités en développement"
+    hu_hu: "Továbbfejlesztett ChatGPT Klón: Jellemzők: OpenAI, Assistants API, Azure, Groq, GPT-4 Vision, Mistral, Bing, Anthropic, OpenRouter, Vertex AI, Gemini, AI modellváltás, üzenetkeresés, langchain, DALL-E-3, ChatGPT Bővítmények, OpenAI Funkciók, Biztonságos Többfelhasználós Rendszer, Presetek, teljes mértékben nyílt forráskódú önálló hosztoláshoz. További funkciók fejlesztés alatt"
+    it_it: "Clone di ChatGPT migliorato: Funzionalità OpenAI, Assistants API, Azure, Groq, GPT-4 Vision, Mistral, Bing, Anthropic, OpenRouter, Vertex AI, Gemini, cambio modello AI, ricerca messaggi, langchain, DALL-E-3, Plugin ChatGPT, Funzioni OpenAI, Sistema multi-utente sicuro, Preset, completamente open-source per self-hosting. Ulteriori funzioni in sviluppo"
+    ru_ru: "Улучшенный клон ChatGPT: Функции OpenAI, Assistants API, Azure, Groq, GPT-4 Vision, Mistral, Bing, Anthropic, OpenRouter, Vertex AI, Gemini, переключение моделей ИИ, поиск сообщений, langchain, DALL-E-3, плагины ChatGPT, функции OpenAI, защищённая многопользовательская система, пресеты, полностью с открытым исходным кодом для самохостинга. Ведётся разработка новых функций"
+    pl_pl: "Ulepszony Klon ChatGPT: Funkcje OpenAI, Assistants API, Azure, Groq, GPT-4 Vision, Mistral, Bing, Anthropic, OpenRouter, Vertex AI, Gemini, przełączanie modeli AI, wyszukiwanie wiadomości, langchain, DALL-E-3, Wtyczki ChatGPT, Funkcje OpenAI, Bezpieczny system wieloużytkownikowy, Presety, całkowicie open-source do samodzielnego hostingu. Więcej funkcji w opracowaniu"
+    pt_br: "Clonagem Aprimorada do ChatGPT: Recursos OpenAI, Assistants API, Azure, Groq, GPT-4 Vision, Mistral, Bing, Anthropic, OpenRouter, Vertex AI, Gemini, troca de modelo AI, pesquisa de mensagens, langchain, DALL-E-3, Plugins ChatGPT, Funções OpenAI, Sistema Multiusuário Seguro, Predefinições, totalmente open-source para auto-hospedagem. Mais recursos em desenvolvimento"
+    sv_se: "Förbättrad ChatGPT-klon: Funktioner inkluderar OpenAI, Assistants API, Azure, Groq, GPT-4 Vision, Mistral, Bing, Anthropic, OpenRouter, Vertex AI, Gemini, AI-modellbyte, meddelandesökning, langchain, DALL-E-3, ChatGPT-plugins, OpenAI-funktioner, säkert fleranvändarsystem, förinställningar, helt öppen källkod för självhosting. Fler funktioner under utveckling"
+    uk_ua: "Покращений клон ChatGPT: Характеристики OpenAI, Assistants API, Azure, Groq, GPT-4 Vision, Mistral, Bing, Anthropic, OpenRouter, Vertex AI, Gemini, перемикання моделей AI, пошук повідомлень, langchain, DALL-E-3, Плагіни ChatGPT, Функції OpenAI, Захищена багатокористувацька система, Пресети, повністю з відкритим кодом для самостійного хостингу. Більше функцій в розробці"
+  developer: LibreChat
+  icon: https://cdn.jsdelivr.net/gh/IceWhaleTech/CasaOS-AppStore@main/Apps/LibreChat/icon.png
+  screenshot_link:
+    - https://cdn.jsdelivr.net/gh/IceWhaleTech/CasaOS-AppStore@main/Apps/LibreChat/screenshot-1.jpg
+    - https://cdn.jsdelivr.net/gh/IceWhaleTech/CasaOS-AppStore@main/Apps/LibreChat/screenshot-2.jpg
+    - https://cdn.jsdelivr.net/gh/IceWhaleTech/CasaOS-AppStore@main/Apps/LibreChat/screenshot-3.jpg
+    - https://cdn.jsdelivr.net/gh/IceWhaleTech/CasaOS-AppStore@main/Apps/LibreChat/screenshot-4.jpg
+  tagline:
+    en_us: "Enhanced open-source AI clone with extensive features"
+    zh_cn: "增强型开源AI克隆，功能丰富"
+    ar_sa: "نسخة محسنة مفتوحة المصدر من AI بميزات واسعة"
+    de_de: "Verbesserter Open-Source-AI-Klon mit umfangreichen Funktionen"
+    es_es: "Clon de IA de código abierto mejorado con amplias características"
+    fr_fr: "Clone IA open source amélioré avec de nombreuses fonctionnalités"
+    hu_hu: "Továbbfejlesztett nyílt forráskódú AI klón széleskörű funkciókkal"
+    it_it: "Clone AI open source migliorato con funzionalità estese"
+    ru_ru: "Улучшенный ИИ-клон с открытым исходным кодом и широкими функциями"
+    pl_pl: "Ulepszony klon AI open-source z rozbudowanymi funkcjami"
+    pt_br: "Clonagem de IA open-source aprimorada com recursos extensos"
+    sv_se: "Förbättrad öppen källkod AI-klon med omfattande funktioner"
+    uk_ua: "Покращений AI-клон з відкритим кодом з широким переліком функцій"
+  thumbnail: https://cdn.jsdelivr.net/gh/IceWhaleTech/CasaOS-AppStore@main/Apps/LibreChat/thumbnail.png
+  tips: {}
+  title:
+    en_us: LibreChat
+  index: /
+  port_map: "3080"
